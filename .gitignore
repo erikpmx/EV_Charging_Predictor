@@ -1,5 +1,12 @@
-         __pycache__/
+cat <<EOF > .gitignore
+# Entorno virtual
+venv/
+.venv/
+
+# Byte-code y caches
+__pycache__/
 *.py[cod]
-.env
+
+# Archivos de sistema
 .DS_Store
-*.joblib
+EOF
