@@ -1,18 +1,5 @@
-# Byte-compiled / optimized / DLL files
-__pycache__/
+         __pycache__/
 *.py[cod]
-*$py.class
-
-# Virtual environments
-venv/
-.env/
-
-# IDE settings
-.idea/
-
-# Data and models
-*.joblib
-*.pkl
-
-# OS files
+.env
 .DS_Store
+*.joblib
