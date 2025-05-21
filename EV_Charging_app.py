@@ -1,5 +1,3 @@
-# File: ev_charging_app.py
-
 import os
 import streamlit as st
 import pandas as pd
@@ -14,20 +12,24 @@ from datetime import datetime
 def load_model(path: str):
     return joblib.load(path)
 
+# -------------------------------------------------------------------
+# 2) Selección de modelo en la barra lateral
+# -------------------------------------------------------------------
 st.sidebar.header("Model Selection")
 model_choice = st.sidebar.selectbox(
     "Select a regression model",
-    ("Linear Regression", "Support Vector Machine")
-)
-# Selección de filename según elección
-model_file = (
-    "EV_Charging_LR.joblib"
-    if model_choice == "Linear Regression"
-    else "EV_Charging_SVM.joblib"
+    ("Linear Regression", "Support Vector Machine", "Random Forest")
 )
 
-# Construye la ruta absoluta al .joblib
+# Mapear elección de modelo al archivo .joblib correspondiente
 script_dir = os.path.dirname(os.path.abspath(__file__))
+if model_choice == "Linear Regression":
+    model_file = "EV_Charging_LR.joblib"
+elif model_choice == "Support Vector Machine":
+    model_file = "EV_Charging_SVM.joblib"
+else:
+    model_file = "EV_Charging_RF.joblib"
+
 model_path = os.path.join(script_dir, model_file)
 
 if not os.path.exists(model_path):
@@ -37,33 +39,23 @@ if not os.path.exists(model_path):
 model = load_model(model_path)
 
 # -------------------------------------------------------------------
-# 2) Extraer categorías y construir mapping espacio→estaciones real
+# 3) Extraer categorías y construir mapping espacio→estaciones real
 # -------------------------------------------------------------------
 preproc = model.named_steps["preprocessor"]
 onehot  = preproc.named_transformers_["cat"].named_steps["onehot"]
-
-# Todas las opciones de spaceID (para el selectbox)
 all_spaces = list(onehot.categories_[1])
 
-# Carga tu CSV con las parejas (spaceID, stationID)
+# Cargar CSV con las parejas (spaceID, stationID)
 csv_path = os.path.join(script_dir, "ev_charging_sessions_16000.csv")
 if not os.path.exists(csv_path):
     st.error(f"❌ No se encontró el archivo CSV de sesiones:\n{csv_path}")
     st.stop()
 
-df_map = pd.read_csv(csv_path, usecols=["spaceID","stationID"])
-df_map = df_map.drop_duplicates()
-
-# Diccionario: spaceID → [stationID, stationID, ...]
-space_to_stations = (
-    df_map
-    .groupby("spaceID")["stationID"]
-    .apply(list)
-    .to_dict()
-)
+df_map = pd.read_csv(csv_path, usecols=["spaceID","stationID"]).drop_duplicates()
+space_to_stations = df_map.groupby("spaceID")["stationID"].apply(list).to_dict()
 
 # -------------------------------------------------------------------
-# 3) Layout de la app
+# 4) Layout de la app
 # -------------------------------------------------------------------
 st.title("⚡ EV Charging Energy Predictor")
 st.markdown(f"**Using model:** {model_choice}")
@@ -97,7 +89,7 @@ st.sidebar.header("Predict")
 predict = st.sidebar.button("Predict kWh delivered")
 
 # -------------------------------------------------------------------
-# 4) Predicción
+# 5) Predicción
 # -------------------------------------------------------------------
 if predict:
     # Construir datetime y features
