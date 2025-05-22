@@ -42,7 +42,7 @@ class DateTimeFeatures(BaseEstimator, TransformerMixin):
         return X
 
 # -------------------------------------------------------------------
-# 1) Carga del modelo
+# 1) Carga del modelo (pipeline completo)
 # -------------------------------------------------------------------
 @st.cache_resource
 def load_model(path: str):
@@ -62,14 +62,14 @@ model_choice = st.sidebar.selectbox(
 )
 
 script_dir = os.path.dirname(os.path.abspath(__file__))
-model_file = {
+model_file_map = {
     "Linear Regression":      "EV_Charging_LR.joblib",
     "Support Vector Machine": "EV_Charging_SVM.joblib",
     "Random Forest":          "EV_Charging_RF.joblib",
     "XGBoost":                "EV_Charging_XGBoost.joblib"
-}[model_choice]
+}
+model_path = os.path.join(script_dir, model_file_map[model_choice])
 
-model_path = os.path.join(script_dir, model_file)
 if not os.path.exists(model_path):
     st.error(f"❌ No se encontró el archivo de modelo:\n{model_path}")
     st.stop()
@@ -79,12 +79,6 @@ model = load_model(model_path)
 # -------------------------------------------------------------------
 # 3) Mapeo espacio → estaciones
 # -------------------------------------------------------------------
-steps = list(model.steps)
-dt_feats, preproc, regressor = [step[1] for step in steps]
-
-onehot = preproc.named_transformers_["cat"].named_steps["onehot"]
-all_spaces = list(onehot.categories_[1])
-
 csv_path = os.path.join(script_dir, "ev_charging_sessions_16000.csv")
 if not os.path.exists(csv_path):
     st.error(f"❌ No se encontró el archivo CSV de sesiones:\n{csv_path}")
@@ -92,6 +86,7 @@ if not os.path.exists(csv_path):
 
 df_map = pd.read_csv(csv_path, usecols=["spaceID","stationID"]).drop_duplicates()
 space_to_stations = df_map.groupby("spaceID")["stationID"].apply(list).to_dict()
+all_spaces = list(space_to_stations.keys())
 
 # -------------------------------------------------------------------
 # 4) Diseño de la app
@@ -121,7 +116,7 @@ st.markdown(
 )
 
 st.sidebar.header("Session Details")
-# Ahora pasamos directamente el valor por defecto al widget y dejamos que Streamlit gestione el estado
+
 date = st.sidebar.date_input(
     "Charging start date",
     datetime.now().date(),
@@ -156,15 +151,7 @@ if predict:
     })
 
     try:
-        if model_choice == "XGBoost":
-            X_dt  = dt_feats.transform(X_input)
-            X_pre = preproc.transform(X_dt)
-            dmat    = xgb.DMatrix(X_pre, feature_names=preproc.get_feature_names_out())
-            booster = regressor.get_booster()
-            pred_kwh = booster.predict(dmat)[0]
-        else:
-            pred_kwh = model.predict(X_input)[0]
-
+        pred_kwh = model.predict(X_input)[0]
         st.success(f"Predicted energy delivered: **{pred_kwh:.2f} kWh**")
     except Exception as e:
         st.error(f"Error durante la predicción:\n{e}")
